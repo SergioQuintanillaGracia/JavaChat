@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.util.LinkedList;
 
 class Server {
-    static final String VERSION = "0.1";
+    private static final String VERSION = "0.1";
     private int port;
     private LinkedList<User> users = new LinkedList<>();
 
