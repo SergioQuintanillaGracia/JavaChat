@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.util.LinkedList;
 
 class Server {
-    private static final String VERSION = "0.1";
+    private static final String VERSION = "1";
     private int port;
     private LinkedList<User> users = new LinkedList<>();
 
@@ -50,6 +50,15 @@ class Server {
         }
     }
 
+    /* Returns a welcome message that can be sent to a user when they connect to the server */
+    public String getWelcomeMessage(User u) {
+        return """
+                #  Welcome to the main JavaChat server!
+                #  Server version: %s
+                #  Logged as: %s
+                """
+                .formatted(VERSION, u.getName());
+    }
 
     /* Sends a message to a specific user */
     public void sendMessage(String msg, User fromUser, User toUser) {
@@ -75,6 +84,9 @@ class ClientThread extends Thread {
     public ClientThread(Server server, User user) {
         this.server = server;
         this.user = user;
+
+        // Send a welcome message to the user
+        user.sendString(server.getWelcomeMessage(user));
     }
 
     @Override

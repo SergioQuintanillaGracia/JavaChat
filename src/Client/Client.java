@@ -1,6 +1,7 @@
 package Client;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Scanner;
 
@@ -12,24 +13,29 @@ class Client {
         try (Socket client = new Socket(address, port)) {
             System.out.printf("[!] Connected to %s:%d\n", address, port);
 
-            // Create a thread to handle incoming messages while also being able to write
-            ReadThread rt = new ReadThread(client);
-            rt.start();
+            try {
+                // Create a thread to handle incoming messages while also being able to write
+                ReadThread rt = new ReadThread(client);
+                rt.start();
 
-            
+                PrintWriter output = new PrintWriter(client.getOutputStream(), true);
 
-            // Create a scanner to read messages from the standard input
-            Scanner sc = new Scanner(System.in);
+                // Create a scanner to read messages from the standard input
+                Scanner sc = new Scanner(System.in);
 
-            // Receive input messages from the user and send them to the server
-            while (true) {
-                String line = sc.nextLine();
+                // Receive input messages from the user and send them to the server
+                while (true) {
+                    String line = sc.nextLine();
 
-                // Exit if the user entered the exit command
-                if (ClientCmds.isCommand(line, ClientCmds.exitCommand)) break;
+                    // Exit if the user entered the exit command
+                    if (ClientCmds.isCommand(line, ClientCmds.exitCommand)) break;
 
-                // Send the message to the server
+                    // Send the message to the server
+                    output.printf("%s\r\n", line);
+                }
 
+            } catch (IOException e) {
+                System.err.println(e.getMessage());
             }
 
             System.out.printf("Disconnected from %s:%d\n", address, port);
@@ -44,13 +50,24 @@ class Client {
 
 class ReadThread extends Thread {
     Socket client;
+    Scanner input;
 
-    public ReadThread(Socket client) {
+    public ReadThread(Socket client) throws IOException {
         this.client = client;
+
+        try {
+            this.input = new Scanner(client.getInputStream());
+
+        } catch (IOException e) {
+            // Throw an IOException with a custom message to inform there was an error getting the input stream
+            throw new IOException("Couldn't get client input stream");
+        }
     }
 
     @Override
     public void run() {
-
+        while (input.hasNextLine()) {
+            System.out.println(input.nextLine());
+        }
     }
 }

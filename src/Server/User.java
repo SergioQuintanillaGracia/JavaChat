@@ -21,6 +21,7 @@ class User {
         try {
             input = new Scanner(s.getInputStream());
             output = new PrintWriter(s.getOutputStream(), true);
+            output = new PrintWriter(s.getOutputStream(), true);
             uid = userCount;
             userCount++;
 
@@ -52,7 +53,7 @@ class User {
         sendString("[%s]: %s".formatted(fromUser.getName(), msg));
     }
 
-    private void sendString(String msg) {
+    public void sendString(String msg) {
         output.printf("%s\r\n", msg);
     }
 }
