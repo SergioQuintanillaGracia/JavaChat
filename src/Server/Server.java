@@ -31,6 +31,7 @@ class Server {
                 try {
                     // Create a user object for the connection
                     User user = new User(client);
+                    users.add(user);
 
                     // Start a thread to handle the connection
                     ClientThread ct = new ClientThread(this, user);

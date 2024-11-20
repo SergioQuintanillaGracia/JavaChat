@@ -6,8 +6,9 @@ import java.net.Socket;
 import java.util.Scanner;
 
 class User {
-    // User ID, incremented by 1 for each created user
-    static int uid = 0;
+    static int userCount = 0;
+    // UID, used to identify users
+    int uid;
 
     Socket socket;
     Scanner input;
@@ -19,7 +20,9 @@ class User {
         // Create input and output streams
         try {
             input = new Scanner(s.getInputStream());
-            output = new PrintWriter(s.getOutputStream());
+            output = new PrintWriter(s.getOutputStream(), true);
+            uid = userCount;
+            userCount++;
 
         } catch (IOException e) {
             // Throw an IOException with a custom message to inform there was an error creating the user
