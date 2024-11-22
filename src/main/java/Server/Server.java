@@ -6,9 +6,10 @@ import java.net.Socket;
 import java.util.LinkedList;
 
 class Server {
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
     private int port;
     private LinkedList<User> users = new LinkedList<>();
+    public static String noticePref = "    * ";
 
     public Server(int port) {
         this.port = port;
@@ -66,13 +67,33 @@ class Server {
     }
 
     /* Sends a message to all users connected to the server */
-    public void broadcastMessage(String msg, User fromUser) {
+    public synchronized void broadcastMessage(String msg, User fromUser) {
+        // Send the message to every user except the sender
         for (User u : users) {
-            // Send the message to every user except the sender
             if (u != fromUser) {
                 sendMessage(msg, fromUser, u);
             }
         }
+    }
+
+    public synchronized void broadcastNotice(String msg) {
+        // Send the notice to every user
+        for (User u : users) {
+            u.sendString(msg);
+        }
+    }
+
+    public synchronized void broadcastNotice(String msg, User exceptUser) {
+        // Send the notice to every user except `exceptUser`
+        for (User u : users) {
+            if (u != exceptUser) {
+                u.sendString(msg);
+            }
+        }
+    }
+
+    public synchronized void removeUser(User user) {
+        users.remove(user);
     }
 }
 
@@ -85,6 +106,9 @@ class ClientThread extends Thread {
         this.server = server;
         this.user = user;
 
+        System.out.printf("User %s connected\n", user.getName());
+        server.broadcastNotice("%sUser %s joined the chat".formatted(Server.noticePref, user.getName()), user);
+
         // Send a welcome message to the user
         user.sendString(server.getWelcomeMessage(user));
     }
@@ -94,5 +118,10 @@ class ClientThread extends Thread {
         while (user.hasNextMessage()) {
             server.broadcastMessage(user.getNextMessage(), user);
         }
+
+        System.out.printf("User %s disconnected\n", user.getName());
+        server.broadcastNotice("%sUser %s left the chat".formatted(Server.noticePref, user.getName()));
+
+        server.removeUser(user);
     }
 }
