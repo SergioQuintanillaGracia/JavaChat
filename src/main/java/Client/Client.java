@@ -41,7 +41,7 @@ public class Client {
                 // Receive input messages from the user and send them to the server
                 while (true) {
                     // Read a message from the user
-                    String line = lineReader.readLine();
+                    String line = lineReader.readLine("> ");
 
                     // Exit if the user entered the exit command
                     if (ClientCmds.isCommand(line, ClientCmds.exitCommand)) break;
