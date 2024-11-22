@@ -1,31 +1,47 @@
 package Client;
 
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Scanner;
 
-class Client {
+public class Client {
     private static String address = "localhost";
     private static int port = 49200;
 
     public static void main(String[] args) {
+        Terminal terminal;
+        LineReader lineReader;
+
+        try {
+            terminal = TerminalBuilder.builder().system(true).build();
+            lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+
+        } catch (IOException e) {
+            System.err.println("Error building terminal");
+            System.err.println(e.getMessage());
+            return;
+        }
+
         try (Socket client = new Socket(address, port)) {
             System.out.printf("[!] Connected to %s:%d\n", address, port);
 
             try {
                 // Create a thread to handle incoming messages while also being able to write
-                ReadThread rt = new ReadThread(client);
+                ReadThread rt = new ReadThread(client, lineReader);
                 rt.start();
 
                 PrintWriter output = new PrintWriter(client.getOutputStream(), true);
 
-                // Create a scanner to read messages from the standard input
-                Scanner sc = new Scanner(System.in);
-
                 // Receive input messages from the user and send them to the server
                 while (true) {
-                    String line = sc.nextLine();
+                    // Read a message from the user
+                    String line = lineReader.readLine();
 
                     // Exit if the user entered the exit command
                     if (ClientCmds.isCommand(line, ClientCmds.exitCommand)) break;
@@ -51,8 +67,9 @@ class Client {
 class ReadThread extends Thread {
     Socket client;
     Scanner input;
+    LineReader lineReader;
 
-    public ReadThread(Socket client) throws IOException {
+    public ReadThread(Socket client, LineReader lineReader) throws IOException {
         this.client = client;
 
         try {
@@ -62,12 +79,14 @@ class ReadThread extends Thread {
             // Throw an IOException with a custom message to inform there was an error getting the input stream
             throw new IOException("Couldn't get client input stream");
         }
+
+        this.lineReader = lineReader;
     }
 
     @Override
     public void run() {
         while (input.hasNextLine()) {
-            System.out.println(input.nextLine());
+            lineReader.printAbove(input.nextLine());
         }
     }
 }
