@@ -21,7 +21,6 @@ class User {
         try {
             input = new Scanner(s.getInputStream());
             output = new PrintWriter(s.getOutputStream(), true);
-            output = new PrintWriter(s.getOutputStream(), true);
             uid = userCount;
             userCount++;
 
