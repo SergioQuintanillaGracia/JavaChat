@@ -11,13 +11,38 @@ import java.net.Socket;
 import java.util.Scanner;
 
 public class Client {
-    private static String address = "localhost";
+    private static final int MIN_PORT_NUM = 2;
+    private static final int MAX_PORT_NUM = 65535;
+    private static String address = "javachat.ddns.net";
     private static int port = 49200;
-    private static final String inputPrompt = "> ";
-    private static final String inputMsgPref = "[You]: ";
-    private static final String warningPref = "[!] ";
+    private static String inputPrompt = "> ";
+    private static String inputMsgPref = "[You]: ";
+    private static String warningPref = "    [!] ";
+    private static String commandUsage = "Usage: 'java -jar client.jar (address) (port)'";
 
     public static void main(String[] args) {
+        // Handle input arguments
+        if (args.length > 2) {
+            System.out.printf("Too many arguments. %s\n", commandUsage);
+            return;
+        }
+
+        // If there is at least one argument, set `address` to the first one
+        if (args.length >= 1) {
+            address = args[0];
+
+            // If a second argument is provided, set it as the port
+            if (args.length == 2) {
+                if (isValidPortString(args[1])) {
+                    port = Integer.parseInt(args[1]);
+                } else {
+                    System.out.printf("Invalid port. Valid port number range: [%d, %d]\n%s\n",
+                            MIN_PORT_NUM, MAX_PORT_NUM, commandUsage);
+                    return;
+                }
+            }
+        }
+
         Terminal terminal;
         LineReader lineReader;
 
@@ -32,7 +57,7 @@ public class Client {
         }
 
         try (Socket client = new Socket(address, port)) {
-            System.out.printf("%sConnected to %s:%d\n", warningPref, address, port);
+            System.out.printf("\n%sConnected to %s:%d\n\n", warningPref, address, port);
 
             try {
                 // Create a thread to handle incoming messages while also being able to write
@@ -93,6 +118,15 @@ public class Client {
     public static void terminalWrite(Terminal terminal, String msg) {
         terminal.writer().print(msg);
         terminal.flush();
+    }
+
+    public static boolean isValidPortString(String str) {
+        try {
+            int portNum = Integer.parseInt(str);
+            return portNum >= MIN_PORT_NUM && portNum <= MAX_PORT_NUM;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
 
