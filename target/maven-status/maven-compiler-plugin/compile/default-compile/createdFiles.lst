@@ -1,8 +1,9 @@
 Server/Server$1.class
 Server/AuthState.class
 Protocol/Protocol.class
+Server/ClientThread.class
 Protocol/Protocol$Server.class
 Protocol/Protocol$Client.class
-Server/ClientThread.class
 Protocol/Protocol$AuthData.class
 Server/Server.class
+Utils/Utils.class

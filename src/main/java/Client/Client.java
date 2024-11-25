@@ -6,6 +6,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import Protocol.Protocol;
 import Protocol.Protocol.AuthData;
+import Utils.Utils;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -13,16 +14,14 @@ import java.net.Socket;
 import java.util.Scanner;
 
 public class Client {
-    private static final int MIN_PORT_NUM = 2;
-    private static final int MAX_PORT_NUM = 65535;
     private static String address = "javachat.ddns.net";
     private static int port = 49200;
+    private static String commandUsage = "Usage: 'java -jar client.jar (address) (port)'";
     private static final Object userInputLock = new Object();
     private static boolean userInputEnabled = false;
     private static String inputPrompt = "> ";
     private static String inputMsgPref = "[You]: ";
     private static String warningPref = "    [!] ";
-    private static String commandUsage = "Usage: 'java -jar client.jar (address) (port)'";
 
     static PrintWriter output;
 
@@ -39,11 +38,11 @@ public class Client {
 
             // If a second argument is provided, set it as the port
             if (args.length == 2) {
-                if (isValidPortString(args[1])) {
+                if (Utils.isValidPortString(args[1])) {
                     port = Integer.parseInt(args[1]);
                 } else {
                     System.out.printf("Invalid port. Valid port number range: [%d, %d]\n%s\n",
-                            MIN_PORT_NUM, MAX_PORT_NUM, commandUsage);
+                            Utils.MIN_PORT_NUM, Utils.MAX_PORT_NUM, commandUsage);
                     return;
                 }
             }
@@ -170,15 +169,6 @@ public class Client {
         // is greater than 0
         if (backDownLineCount > 0) {
             terminalWrite(terminal, "\033[" + backDownLineCount + "B");
-        }
-    }
-
-    public static boolean isValidPortString(String str) {
-        try {
-            int portNum = Integer.parseInt(str);
-            return portNum >= MIN_PORT_NUM && portNum <= MAX_PORT_NUM;
-        } catch (Exception e) {
-            return false;
         }
     }
 

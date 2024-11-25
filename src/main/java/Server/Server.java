@@ -1,6 +1,8 @@
 package Server;
 
 import Protocol.Protocol;
+import Protocol.Protocol.AuthData;
+import Utils.Utils;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -9,12 +11,11 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
-import Protocol.Protocol.AuthData;
-
 class Server {
-    private static final String VERSION = "3";
+    private static final String VERSION = "4";
+    private static int port = 49200;
+    private static String commandUsage = "Usage: 'java -jar server.jar (port)'";
     public boolean isAuthEnabled = true;
-    private int port;
     private LinkedList<User> users = new LinkedList<>();
     private HashMap<String, String> userData = new HashMap<>();
     public static String noticePref = "    * ";
@@ -24,7 +25,21 @@ class Server {
     }
 
     public static void main(String[] args) {
-        int port = 49200;
+        if (args.length > 1) {
+            System.out.printf("Too many arguments. %s\n", commandUsage);
+            return;
+        }
+
+        if (args.length == 1) {
+            if (Utils.isValidPortString(args[0])) {
+                port = Integer.parseInt(args[0]);
+            } else {
+                System.out.printf("Invalid port. Valid port number range: [%d, %d]\n%s\n",
+                        Utils.MIN_PORT_NUM, Utils.MAX_PORT_NUM, commandUsage);
+                return;
+            }
+        }
+
         Server server = new Server(port);
         server.start();
     }
