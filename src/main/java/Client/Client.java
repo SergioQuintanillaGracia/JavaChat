@@ -192,7 +192,7 @@ public class Client {
 
         while (!(choice.equals("y") || choice.equals("n"))) {
             if (!firstChoiceInput) {
-                Client.clearPrevLines(terminal, 1, 1);
+                Client.clearPrevLines(terminal, 1, 0);
             }
             choice = lineReader.readLine(inputPrompt).trim().toLowerCase();
             firstChoiceInput = false;
