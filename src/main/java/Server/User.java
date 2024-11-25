@@ -40,6 +40,10 @@ class User {
         return name;
     }
 
+    public int getUid() {
+        return uid;
+    }
+
     public void setName(String newName) {
         name = newName;
     }
@@ -59,4 +63,11 @@ class User {
     public void sendString(String msg) {
         output.printf("%s\r\n", msg);
     }
+}
+
+
+enum AuthState {
+    UNREGISTERED,
+    REGISTERED_WRONG_PASSWORD,
+    REGISTERED_RIGHT_PASSWORD
 }

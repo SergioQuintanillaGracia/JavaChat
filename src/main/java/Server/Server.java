@@ -5,14 +5,18 @@ import Protocol.Protocol;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.NoSuchElementException;
+
 import Protocol.Protocol.AuthData;
 
 class Server {
-    private static final String VERSION = "2";
+    private static final String VERSION = "3";
     public boolean isAuthEnabled = true;
     private int port;
     private LinkedList<User> users = new LinkedList<>();
+    private HashMap<String, String> userData = new HashMap<>();
     public static String noticePref = "    * ";
 
     public Server(int port) {
@@ -59,6 +63,7 @@ class Server {
     /* Returns a welcome message that can be sent to a user when they connect to the server */
     public String getWelcomeMessage(User u) {
         return """
+                
                 #  Welcome to the main JavaChat server!
                 #  Server version: %s
                 #  Logged as: %s
@@ -69,9 +74,95 @@ class Server {
     public boolean authenticate(User user) {
         // Send a string to the client that is interpreted as an authentication request
         user.sendString(Protocol.Server.AUTH_REQUEST);
-        // Get the authentication information sent by the user
-        String authInfoStr = user.getNextMessage();
-        AuthData authInfo = AuthData.fromString(authInfoStr);
+        // Get the next message sent by the user, which may contain authentication information or
+        // a new user creation request
+        String msg = user.getNextMessage();
+
+        if (msg.equals(Protocol.Client.AUTH_CREATE_USER)) {
+            // The user wants to create a new user, its next message should be an AuthData object containing the
+            // new user information
+            AuthData newUserAuthData = AuthData.fromString(user.getNextMessage());
+
+            if (createUser(newUserAuthData)) {
+                // The user was successfully created
+                System.out.printf("User %s was created\n", newUserAuthData.getUsername());
+                user.sendString(Protocol.Server.USER_CREATION_SUCCESSFUL);
+
+            } else {
+                // The user couldn't be created
+                user.sendString(Protocol.Server.USER_CREATION_USER_ALREADY_EXISTS);
+            }
+
+            // Return false, as the user was created but the client didn't authenticate
+            return false;
+        }
+
+        AuthData authData = AuthData.fromString(msg);
+
+        // We want users to be able to authenticate in parallel, but getting the authentication state of a user
+        // (whether the username is registered, they entered the wrong password, or they authenticated successfully
+        // and access to the chat should be granted) can't be done in parallel, as it may lead to race conditions
+        // `handleAuthentication` will run instructions that can't be executed in parallel in a sequential way
+        return handleAuthentication(user, authData);
+    }
+
+    private synchronized boolean handleAuthentication(User user, AuthData authData) {
+        AuthState authState = getAuthState(authData);
+
+        switch (authState) {
+            case UNREGISTERED:
+                // The user is not registered
+                user.sendString(Protocol.Server.AUTH_USER_NOT_REGISTERED);
+                return false;
+
+            case REGISTERED_WRONG_PASSWORD:
+                // The user is registered, but entered a wrong password
+                // Inform the user and return false
+                user.sendString(Protocol.Server.AUTH_WRONG_PASSWORD);
+                return false;
+
+            case REGISTERED_RIGHT_PASSWORD:
+                // Break out of the switch, authentication was successful
+                break;
+
+            default:
+                throw new IllegalStateException("Unexpected authState value: " + authState);
+        }
+
+        // If the execution gets to this part, the user has authenticated successfully by logging with an existing
+        // user and the correct password
+
+        // Authenticate the user only if a user with the same name is not already logged in
+        if (!isUsernameLogged(authData.getUsername())) {
+            user.setName(authData.getUsername());
+            users.add(user);
+            user.sendString(Protocol.Server.AUTH_SUCCESSFUL);
+            return true;
+        } else {
+            user.sendString(Protocol.Server.AUTH_USER_ALREADY_LOGGED);
+            return false;
+        }
+    }
+
+    public boolean isUsernameLogged(String username) {
+        for (User u : users) {
+            if (u.getName().equals(username))
+                return true;
+        }
+
+        return false;
+    }
+
+    public synchronized AuthState getAuthState(AuthData authData) {
+        String password = userData.get(authData.getUsername());
+
+        if (password == null) {
+            return AuthState.UNREGISTERED;
+        } else if (password.equals(authData.getPassword())) {
+            return AuthState.REGISTERED_RIGHT_PASSWORD;
+        } else {
+            return AuthState.REGISTERED_WRONG_PASSWORD;
+        }
     }
 
     /* Sends a message to a specific user */
@@ -105,8 +196,19 @@ class Server {
         }
     }
 
+    public synchronized void addUser(User user) {
+        users.add(user);
+    }
+
     public synchronized void removeUser(User user) {
         users.remove(user);
+    }
+
+    public synchronized boolean createUser(AuthData authData) {
+        String prevPassword = userData.put(authData.getUsername(), authData.getPassword());
+        // `prevPassword` will be null if the user wasn't associated with a password before adding it, which
+        // means the user wasn't registered
+        return prevPassword == null;
     }
 }
 
@@ -123,9 +225,22 @@ class ClientThread extends Thread {
     @Override
     public void run() {
         if (server.isAuthEnabled) {
-            if (server.authenticate(user)) {
-                System.out.println("User %s authenticated successfully");
+            // Keep asking the user to authenticate until authentication is successful
+            // `authenticate()` will run `addUser()` internally to avoid 2 users with
+            // the same name being authenticated successfully in exceptional cases
+            boolean authenticated = false;
+
+            while (!authenticated) {
+                try {
+                    authenticated = server.authenticate(user);
+                } catch (NoSuchElementException e) {
+                    System.out.printf("User %s disconnected during the authentication process\n", user.getName());
+                    return;
+                }
             }
+            System.out.printf("User %s authenticated successfully\n", user.getName());
+        } else {
+            server.addUser(user);
         }
 
         System.out.printf("User %s connected\n", user.getName());
@@ -133,6 +248,9 @@ class ClientThread extends Thread {
 
         // Send a welcome message to the user
         user.sendString(server.getWelcomeMessage(user));
+
+        // Inform the user they can start typing messages
+        user.sendString(Protocol.Server.CAN_TYPE);
 
         while (user.hasNextMessage()) {
             server.broadcastMessage(user.getNextMessage(), user);

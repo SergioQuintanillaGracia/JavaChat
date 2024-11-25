@@ -4,6 +4,8 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
+import Protocol.Protocol;
+import Protocol.Protocol.AuthData;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -15,10 +17,14 @@ public class Client {
     private static final int MAX_PORT_NUM = 65535;
     private static String address = "javachat.ddns.net";
     private static int port = 49200;
+    private static final Object userInputLock = new Object();
+    private static boolean userInputEnabled = false;
     private static String inputPrompt = "> ";
     private static String inputMsgPref = "[You]: ";
     private static String warningPref = "    [!] ";
     private static String commandUsage = "Usage: 'java -jar client.jar (address) (port)'";
+
+    static PrintWriter output;
 
     public static void main(String[] args) {
         // Handle input arguments
@@ -57,22 +63,36 @@ public class Client {
         }
 
         try (Socket client = new Socket(address, port)) {
-            System.out.printf("\n%sConnected to %s:%d\n\n", warningPref, address, port);
+            System.out.printf("\n%sConnected to %s:%d\n", warningPref, address, port);
 
             try {
-                // Create a thread to handle incoming messages while also being able to write
-                ReadThread rt = new ReadThread(client, lineReader);
-                rt.start();
+                output = new PrintWriter(client.getOutputStream(), true);
 
-                PrintWriter output = new PrintWriter(client.getOutputStream(), true);
+                // Create a thread to handle incoming messages while also being able to write
+                ReadThread rt = new ReadThread(client, lineReader, output, terminal);
+                rt.start();
 
                 // Receive input messages from the user and send them to the server
                 while (true) {
+                    // Continue only if user input is enabled (which is disabled by default, and is only enabled
+                    // when the server signals the user can type)
+                    // This mechanism is used to allow the user to enter their username and password before they
+                    // start typing normal messages in servers where authentication is enabled
+                    synchronized (userInputLock) {
+                        while (!userInputEnabled) {
+                            try {
+                                userInputLock.wait();
+                            } catch (InterruptedException e) {
+                                // The program was interrupted
+                                return;
+                            }
+                        }
+                    }
+
                     // Read a message from the user
                     String line = lineReader.readLine(inputPrompt).trim();
-                    // Clear the current terminal line (that contains the message that was just inputted)
-                    terminalWrite(terminal, "\033[1A");  // Move cursor up one line
-                    terminalWrite(terminal, "\033[2K");  // Clear line
+                    // Clear the terminal line above (that contains the message that was just inputted)
+                    clearPrevLines(terminal, 1, 0);
 
                     if (line.isEmpty()) continue;
 
@@ -99,7 +119,7 @@ public class Client {
                         terminalWrite(terminal, "%s%s\n".formatted(inputMsgPref, line));
 
                         // Send the message to the server
-                        output.printf("%s\r\n", line);
+                        sendString(line);
                     }
                 }
 
@@ -115,9 +135,42 @@ public class Client {
         }
     }
 
+    public static void sendString(String str) {
+        output.printf("%s\r\n", str);
+    }
+
+    public static void enableUserInput() {
+        synchronized (userInputLock) {
+            userInputEnabled = true;
+            userInputLock.notify();
+        }
+    }
+
+    public static void disableUserInput() {
+        synchronized (userInputLock) {
+            userInputEnabled = false;
+        }
+    }
+
     public static void terminalWrite(Terminal terminal, String msg) {
         terminal.writer().print(msg);
         terminal.flush();
+    }
+
+    public static void clearPrevLines(Terminal terminal, int clearLineCount, int backDownLineCount) {
+        for (int i = 0; i < clearLineCount; i++) {
+            // Move the cursor up one line
+            terminalWrite(terminal, "\033[1A");
+            // Clear the line
+            terminalWrite(terminal, "\033[2K");
+        }
+
+        // Move the cursor back down
+        // 0 positions down is still interpreted as 1, so we only move the cursor if the value of `backDownLineCount`
+        // is greater than 0
+        if (backDownLineCount > 0) {
+            terminalWrite(terminal, "\033[" + backDownLineCount + "B");
+        }
     }
 
     public static boolean isValidPortString(String str) {
@@ -128,6 +181,25 @@ public class Client {
             return false;
         }
     }
+
+    public static void setInputMsgPref(String newPref) {
+        inputMsgPref = newPref;
+    }
+
+    public static boolean askYesNo(String inputPrompt, Terminal terminal, LineReader lineReader) {
+        String choice = "";
+        boolean firstChoiceInput = true;
+
+        while (!(choice.equals("y") || choice.equals("n"))) {
+            if (!firstChoiceInput) {
+                Client.clearPrevLines(terminal, 1, 1);
+            }
+            choice = lineReader.readLine(inputPrompt).trim().toLowerCase();
+            firstChoiceInput = false;
+        }
+
+        return choice.equals("y");
+    }
 }
 
 
@@ -135,8 +207,15 @@ class ReadThread extends Thread {
     Socket client;
     Scanner input;
     LineReader lineReader;
+    PrintWriter output;
+    Terminal terminal;
+    String username = "Unknown";
+    String password = "";
 
-    public ReadThread(Socket client, LineReader lineReader) throws IOException {
+    boolean showAuthInfo = true;
+    boolean createNewUser = false;
+
+    public ReadThread(Socket client, LineReader lineReader, PrintWriter output, Terminal terminal) throws IOException {
         this.client = client;
 
         try {
@@ -148,12 +227,78 @@ class ReadThread extends Thread {
         }
 
         this.lineReader = lineReader;
+        this.output = output;
+        this.terminal = terminal;
     }
 
     @Override
     public void run() {
         while (input.hasNextLine()) {
-            lineReader.printAbove(input.nextLine());
+            String line = input.nextLine();
+
+            if (line.startsWith(Protocol.PROTOCOL_PREF)) {
+                // The received string is a special request from the server
+                handleProtocolRequest(line);
+            } else {
+                // The received string is a normal message
+                lineReader.printAbove(line);
+            }
+        }
+    }
+
+    private void handleProtocolRequest(String req) {
+        if (req.equals(Protocol.Server.AUTH_REQUEST)) {
+            if (createNewUser) {
+                // The user decided to create a new user when they received the previous authentication request
+                // The server has sent a new authentication request which has to be handled differently for new user
+                // creation
+                Client.sendString(Protocol.Client.AUTH_CREATE_USER);
+                AuthData authData = new AuthData(username, password);
+                Client.sendString(authData.toString());
+
+                createNewUser = false;
+
+            } else {
+                if (showAuthInfo) {
+                    lineReader.printAbove("\nThis server has authentication enabled. Log in / register to enter " +
+                            "the chat:\n");
+                    showAuthInfo = false;
+                }
+
+                this.username = lineReader.readLine("$ Username: ");
+                this.password = lineReader.readLine("$ Password: ", '*');
+
+                Client.clearPrevLines(terminal, 2, 0);
+
+                // Create and send an `AuthData` object to the server
+                AuthData authData = new AuthData(username, password);
+                Client.sendString(authData.toString());
+            }
+
+        } else if (req.equals(Protocol.Server.AUTH_WRONG_PASSWORD)) {
+//            Client.clearPrevLines(terminal, 1, 0);
+            System.out.printf("Wrong password for user %s\n", username);
+
+        } else if (req.equals(Protocol.Server.AUTH_USER_ALREADY_LOGGED)) {
+            System.out.printf("User %s is already logged in\n", username);
+
+        } else if (req.equals(Protocol.Server.AUTH_USER_NOT_REGISTERED)) {
+            System.out.printf("User %s is not registered\nDo you want to create it? (y/n)\n", username);
+            createNewUser = Client.askYesNo("> ", terminal, lineReader);
+            Client.clearPrevLines(terminal, 3, 0);
+
+        } else if (req.equals(Protocol.Server.USER_CREATION_SUCCESSFUL)) {
+            System.out.printf("User %s was registered successfully\n", username);
+
+        } else if (req.equals(Protocol.Server.USER_CREATION_USER_ALREADY_EXISTS)) {
+            System.out.printf("User %s already exists\n", username);
+
+        } else if (req.equals(Protocol.Server.AUTH_SUCCESSFUL)) {
+            lineReader.printAbove("Successfully logged in as %s".formatted(username));
+            Client.setInputMsgPref("[%s]: ".formatted(username));
+
+        } else if (req.equals(Protocol.Server.CAN_TYPE)) {
+            Client.enableUserInput();
         }
     }
 }
