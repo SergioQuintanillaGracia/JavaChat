@@ -9,6 +9,7 @@ class User {
     static int userCount = 0;
     // UID, used to identify users
     int uid;
+    String name;
 
     Socket socket;
     Scanner input;
@@ -22,6 +23,7 @@ class User {
             input = new Scanner(s.getInputStream());
             output = new PrintWriter(s.getOutputStream(), true);
             uid = userCount;
+            name = "UID_%d".formatted(uid);
             userCount++;
 
         } catch (IOException e) {
@@ -35,9 +37,11 @@ class User {
     }
 
     public String getName() {
-        // TODO: Implement username system, at the moment users will be identified by their UID, which changes
-        // TODO: every time they reconnect (which is not ideal)
-        return Integer.toString(uid);
+        return name;
+    }
+
+    public void setName(String newName) {
+        name = newName;
     }
 
     public boolean hasNextMessage() {
