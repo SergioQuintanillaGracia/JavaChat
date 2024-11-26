@@ -138,6 +138,9 @@ public class Client {
         } else if (ClientCmds.isCommand(line, ClientCmds.CLEAR_SCREEN_CMD)) {
             terminal.puts(InfoCmp.Capability.clear_screen);
 
+        } else if (ClientCmds.isCommand(line, ClientCmds.LOAD_MESSAGE_HISTORY_CMD)) {
+            sendString(Protocol.Client.LOAD_MESSAGE_HISTORY);
+
         } else {
             terminalWrite(terminal, "%sUnrecognized command: %s\n".formatted(warningPref, commandName));
         }

@@ -7,18 +7,22 @@ import Utils.Utils;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 class Server {
-    private static final String VERSION = "5";
+    private static final String VERSION = "6";
     private static int port = 49200;
-    private static String commandUsage = "Usage: 'java -jar server.jar (port)'";
     public boolean isAuthEnabled = true;
+
+    private static final int MAX_SAVED_MESSAGES = 100;
+    private static Queue<String> messageHistory = new ArrayDeque<>(MAX_SAVED_MESSAGES);
+
+    private static String commandUsage = "Usage: 'java -jar server.jar (port)'";
+
     private LinkedList<User> users = new LinkedList<>();
     private HashMap<String, String> userData = new HashMap<>();
     public static String noticePref = "    * ";
+
 
     public Server(int port) {
         this.port = port;
@@ -201,35 +205,58 @@ class Server {
         }
     }
 
+    public synchronized void addToHistory(String str) {
+        if (messageHistory.size() >= MAX_SAVED_MESSAGES) {
+            messageHistory.remove();
+        }
+
+        messageHistory.add(str);
+    }
+
+    public String createMessage(String msg, User fromUser) {
+        return "[%s]: %s".formatted(fromUser.getName(), msg);
+    }
+
     /* Sends a message to a specific user */
-    public synchronized void sendMessage(String msg, User fromUser, User toUser) {
-        toUser.sendMessage(msg, fromUser);
+    public synchronized void sendMessage(String msg, User toUser) {
+        toUser.sendString(msg);
     }
 
     /* Sends a message to all users connected to the server */
     public synchronized void broadcastMessage(String msg, User fromUser) {
+        String formattedMsg = createMessage(msg, fromUser);
+
         // Send the message to every user except the sender
         for (User u : users) {
             if (u != fromUser) {
-                sendMessage(msg, fromUser, u);
+                sendMessage(formattedMsg, u);
             }
         }
+
+        // Save the message to the message history queue
+        addToHistory(formattedMsg);
     }
 
-    public synchronized void broadcastNotice(String msg) {
+    public synchronized void broadcastString(String str) {
         // Send the notice to every user
         for (User u : users) {
-            u.sendString(msg);
+            u.sendString(str);
         }
+
+        // Save the string to the message history queue
+        addToHistory(str);
     }
 
-    public synchronized void broadcastNotice(String msg, User exceptUser) {
+    public synchronized void broadcastString(String str, User exceptUser) {
         // Send the notice to every user except `exceptUser`
         for (User u : users) {
             if (u != exceptUser) {
-                u.sendString(msg);
+                u.sendString(str);
             }
         }
+
+        // Save the string to the message history queue
+        addToHistory(str);
     }
 
     public synchronized void addUser(User user) {
@@ -245,6 +272,20 @@ class Server {
         // `prevPassword` will be null if the user wasn't associated with a password before adding it, which
         // means the user wasn't registered
         return prevPassword == null;
+    }
+
+    public synchronized void sendMessageHistory(User user) {
+        for (String s : messageHistory) {
+            user.sendString(s);
+        }
+    }
+
+    public synchronized void handleProtocolMessage(String msg, User user) {
+        switch (msg) {
+            case Protocol.Client.LOAD_MESSAGE_HISTORY -> {
+                sendMessageHistory(user);
+            }
+        }
     }
 }
 
@@ -280,7 +321,7 @@ class ClientThread extends Thread {
         }
 
         System.out.printf("User %s connected\n", user.getName());
-        server.broadcastNotice("%sUser %s joined the chat".formatted(Server.noticePref, user.getName()), user);
+        server.broadcastString("%sUser %s joined the chat".formatted(Server.noticePref, user.getName()), user);
 
         // Send a welcome message to the user
         user.sendString(server.getWelcomeMessage(user));
@@ -289,11 +330,20 @@ class ClientThread extends Thread {
         user.sendString(Protocol.Server.CAN_TYPE);
 
         while (user.hasNextMessage()) {
-            server.broadcastMessage(user.getNextMessage(), user);
+            String msg = user.getNextMessage();
+
+            if (msg.startsWith(Protocol.PROTOCOL_PREF)) {
+                // If the message starts with the protocol prefix, it may not be a normal message, but a request
+                // from the user to the server
+                server.handleProtocolMessage(msg, user);
+
+            } else {
+                server.broadcastMessage(msg, user);
+            }
         }
 
         System.out.printf("User %s disconnected\n", user.getName());
-        server.broadcastNotice("%sUser %s left the chat".formatted(Server.noticePref, user.getName()));
+        server.broadcastString("%sUser %s left the chat".formatted(Server.noticePref, user.getName()));
 
         server.removeUser(user);
     }

@@ -56,12 +56,10 @@ class User {
         return input.nextLine();
     }
 
-    public void sendMessage(String msg, User fromUser) {
-        sendString("[%s]: %s".formatted(fromUser.getName(), msg));
-    }
-
+    /* Returns the string sent to the server */
     public void sendString(String msg) {
-        output.printf("%s\r\n", msg);
+        String stringToSend = msg + "\r\n";
+        output.printf(stringToSend);
     }
 }
 

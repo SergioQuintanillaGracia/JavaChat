@@ -4,6 +4,7 @@ class ClientCmds {
     static final String commandPrefix = "/";
     static final String EXIT_CMD = "exit";
     static final String CLEAR_SCREEN_CMD = "clear";
+    static final String LOAD_MESSAGE_HISTORY_CMD = "load";
 
     static boolean hasCommandPref(String msg) {
         String trimMsg = msg.trim();

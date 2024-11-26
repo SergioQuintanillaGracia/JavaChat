@@ -18,10 +18,12 @@ public class Protocol {
         public static final String USER_CREATION_SUCCESSFUL = PROTOCOL_PREF + "user_creation_successful";
         public static final String CAN_TYPE = PROTOCOL_PREF + "can_type";
         public static final String MESSAGE_TOO_LONG = PROTOCOL_PREF + "message_too_long";
+        public static final String MESSAGE_HISTORY_END = PROTOCOL_PREF + "message_history_end";
     }
 
     public static class Client {
         public static final String AUTH_CREATE_USER = PROTOCOL_PREF + "auth_create_new_user";
+        public static final String LOAD_MESSAGE_HISTORY = PROTOCOL_PREF + "load_message_history";
     }
 
     public static class AuthData {
