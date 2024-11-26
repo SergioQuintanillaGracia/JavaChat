@@ -12,7 +12,7 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 
 class Server {
-    private static final String VERSION = "4";
+    private static final String VERSION = "5";
     private static int port = 49200;
     private static String commandUsage = "Usage: 'java -jar server.jar (port)'";
     public boolean isAuthEnabled = true;
