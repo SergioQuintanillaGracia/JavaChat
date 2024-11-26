@@ -237,58 +237,75 @@ class ReadThread extends Thread {
     }
 
     private void handleProtocolRequest(String req) {
-        if (req.equals(Protocol.Server.AUTH_REQUEST)) {
-            if (createNewUser) {
-                // The user decided to create a new user when they received the previous authentication request
-                // The server has sent a new authentication request which has to be handled differently for new user
-                // creation
-                Client.sendString(Protocol.Client.AUTH_CREATE_USER);
-                AuthData authData = new AuthData(username, password);
-                Client.sendString(authData.toString());
+        switch (req) {
+            case Protocol.Server.AUTH_REQUEST -> {
+                if (createNewUser) {
+                    // The user decided to create a new user when they received the previous authentication request
+                    // The server has sent a new authentication request which has to be handled differently for new user
+                    // creation
+                    Client.sendString(Protocol.Client.AUTH_CREATE_USER);
+                    AuthData authData = new AuthData(username, password);
+                    Client.sendString(authData.toString());
 
-                createNewUser = false;
+                    createNewUser = false;
 
-            } else {
-                if (showAuthInfo) {
-                    lineReader.printAbove("\nThis server has authentication enabled. Log in / register to enter " +
-                            "the chat:\n");
-                    showAuthInfo = false;
+                } else {
+                    if (showAuthInfo) {
+                        lineReader.printAbove("\nThis server has authentication enabled. Log in / register to " +
+                                "enter the chat:\n");
+                        showAuthInfo = false;
+                    }
+
+                    this.username = lineReader.readLine("$ Username: ");
+                    this.password = lineReader.readLine("$ Password: ", '*');
+
+                    Client.clearPrevLines(terminal, 2, 0);
+
+                    // Create and send an `AuthData` object to the server
+                    AuthData authData = new AuthData(username, password);
+                    Client.sendString(authData.toString());
                 }
-
-                this.username = lineReader.readLine("$ Username: ");
-                this.password = lineReader.readLine("$ Password: ", '*');
-
-                Client.clearPrevLines(terminal, 2, 0);
-
-                // Create and send an `AuthData` object to the server
-                AuthData authData = new AuthData(username, password);
-                Client.sendString(authData.toString());
             }
 
-        } else if (req.equals(Protocol.Server.AUTH_WRONG_PASSWORD)) {
-//            Client.clearPrevLines(terminal, 1, 0);
-            System.out.printf("Wrong password for user %s\n", username);
+            case Protocol.Server.EMPTY_USER_OR_PASSWORD -> {
+                System.out.println("This server doesn't allow empty usernames / passwords");
+            }
 
-        } else if (req.equals(Protocol.Server.AUTH_USER_ALREADY_LOGGED)) {
-            System.out.printf("User %s is already logged in\n", username);
+            case Protocol.Server.USERNAME_OUT_OF_RANGE -> {
+                System.out.printf("The username must be between %d and %d characters long.\n",
+                        AuthData.MIN_USERNAME_LENGTH, AuthData.MAX_USERNAME_LENGTH);
+            }
 
-        } else if (req.equals(Protocol.Server.AUTH_USER_NOT_REGISTERED)) {
-            System.out.printf("User %s is not registered\nDo you want to create it? (y/n)\n", username);
-            createNewUser = Client.askYesNo("> ", terminal, lineReader);
-            Client.clearPrevLines(terminal, 3, 0);
+            case Protocol.Server.AUTH_WRONG_PASSWORD -> {
+                System.out.printf("Wrong password for user %s\n", username);
+            }
 
-        } else if (req.equals(Protocol.Server.USER_CREATION_SUCCESSFUL)) {
-            System.out.printf("User %s was registered successfully\n", username);
+            case Protocol.Server.AUTH_USER_ALREADY_LOGGED -> {
+                System.out.printf("User %s is already logged in\n", username);
+            }
 
-        } else if (req.equals(Protocol.Server.USER_CREATION_USER_ALREADY_EXISTS)) {
-            System.out.printf("User %s already exists\n", username);
+            case Protocol.Server.AUTH_USER_NOT_REGISTERED -> {
+                System.out.printf("User %s is not registered\nDo you want to create it? (y/n)\n", username);
+                createNewUser = Client.askYesNo("> ", terminal, lineReader);
+                Client.clearPrevLines(terminal, 3, 0);
+            }
 
-        } else if (req.equals(Protocol.Server.AUTH_SUCCESSFUL)) {
-            lineReader.printAbove("Successfully logged in as %s".formatted(username));
-            Client.setInputMsgPref("[%s]: ".formatted(username));
+            case Protocol.Server.USER_CREATION_SUCCESSFUL -> {
+                System.out.printf("User %s was registered successfully\n", username);
+            }
 
-        } else if (req.equals(Protocol.Server.CAN_TYPE)) {
-            Client.enableUserInput();
+            case Protocol.Server.USER_CREATION_USER_ALREADY_EXISTS -> {
+                System.out.printf("User %s already exists\n", username);
+            }
+
+            case Protocol.Server.AUTH_SUCCESSFUL -> {
+                lineReader.printAbove("Successfully logged in as %s".formatted(username));
+                Client.setInputMsgPref("[%s]: ".formatted(username));
+            }
+
+            case Protocol.Server.CAN_TYPE -> {
+                Client.enableUserInput();
+            }
         }
     }
 }

@@ -97,6 +97,9 @@ class Server {
             // The user wants to create a new user, its next message should be an AuthData object containing the
             // new user information
             AuthData newUserAuthData = AuthData.fromString(user.getNextMessage());
+            if (!handleValidAuthData(newUserAuthData, user)) {
+                return false;
+            }
 
             if (createUser(newUserAuthData)) {
                 // The user was successfully created
@@ -113,12 +116,30 @@ class Server {
         }
 
         AuthData authData = AuthData.fromString(msg);
+        if (!handleValidAuthData(authData, user)) {
+            return false;
+        }
 
         // We want users to be able to authenticate in parallel, but getting the authentication state of a user
         // (whether the username is registered, they entered the wrong password, or they authenticated successfully
         // and access to the chat should be granted) can't be done in parallel, as it may lead to race conditions
         // `handleAuthentication` will run instructions that can't be executed in parallel in a sequential way
         return handleAuthentication(user, authData);
+    }
+
+    public static boolean handleValidAuthData(AuthData authData, User user) {
+        if (authData == null || authData.getUsername().isEmpty() || authData.getPassword().isEmpty()) {
+            user.sendString(Protocol.Server.EMPTY_USER_OR_PASSWORD);
+            return false;
+        }
+
+        if (authData.getUsername().length() < AuthData.MIN_USERNAME_LENGTH ||
+                authData.getUsername().length() > AuthData.MAX_USERNAME_LENGTH) {
+            user.sendString(Protocol.Server.USERNAME_OUT_OF_RANGE);
+            return false;
+        }
+
+        return true;
     }
 
     private synchronized boolean handleAuthentication(User user, AuthData authData) {
@@ -181,7 +202,7 @@ class Server {
     }
 
     /* Sends a message to a specific user */
-    public void sendMessage(String msg, User fromUser, User toUser) {
+    public synchronized void sendMessage(String msg, User fromUser, User toUser) {
         toUser.sendMessage(msg, fromUser);
     }
 

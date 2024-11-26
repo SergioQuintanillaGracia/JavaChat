@@ -7,6 +7,8 @@ public class Protocol {
 
     public static class Server {
         public static final String AUTH_REQUEST = PROTOCOL_PREF + "auth_request";
+        public static final String EMPTY_USER_OR_PASSWORD = PROTOCOL_PREF + "empty_user_or_password";
+        public static final String USERNAME_OUT_OF_RANGE = PROTOCOL_PREF + "username_out_of_range";
         public static final String AUTH_USER_NOT_REGISTERED = PROTOCOL_PREF + "auth_user_not_registered";
         public static final String AUTH_WRONG_PASSWORD = PROTOCOL_PREF + "auth_wrong_password";
         public static final String AUTH_USER_ALREADY_LOGGED = PROTOCOL_PREF + "auth_already_logged";
@@ -22,6 +24,9 @@ public class Protocol {
     }
 
     public static class AuthData {
+        public static int MIN_USERNAME_LENGTH = 3;
+        public static int MAX_USERNAME_LENGTH = 14;
+
         private static final String separator = ":";
         private final String username;
         private final String password;
