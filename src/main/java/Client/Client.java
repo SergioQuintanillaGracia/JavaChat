@@ -7,6 +7,7 @@ import org.jline.terminal.TerminalBuilder;
 import Protocol.Protocol;
 import Protocol.Protocol.AuthData;
 import Utils.Utils;
+import org.jline.utils.InfoCmp;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -19,6 +20,7 @@ public class Client {
     private static String commandUsage = "Usage: 'java -jar client.jar (address) (port)'";
     private static final Object userInputLock = new Object();
     private static boolean userInputEnabled = false;
+    private static boolean exit = false;
     private static String inputPrompt = "> ";
     private static String inputMsgPref = "[You]: ";
     private static String warningPref = "    [!] ";
@@ -72,7 +74,7 @@ public class Client {
                 rt.start();
 
                 // Receive input messages from the user and send them to the server
-                while (true) {
+                while (!exit) {
                     // Continue only if user input is enabled (which is disabled by default, and is only enabled
                     // when the server signals the user can type)
                     // This mechanism is used to allow the user to enter their username and password before they
@@ -97,21 +99,7 @@ public class Client {
 
                     if (ClientCmds.hasCommandPref(line)) {
                         // The inputted message may be a command
-                        // Exit if the user entered the exit command
-                        String commandName = ClientCmds.removeCommandPref(line);
-
-                        // Handle the case where the message is just the command prefix
-                        if (commandName.isEmpty()) {
-                            terminalWrite(terminal, "%sType a command after %s to run it\n".formatted(warningPref,
-                                    ClientCmds.commandPrefix));
-                            continue;
-                        }
-
-                        // Check if the inputted command exists, and run the corresponding code for it
-                        if (ClientCmds.isCommand(line, ClientCmds.exitCommand)) break;
-                        else {
-                            terminalWrite(terminal, "%sUnrecognized command: %s\n".formatted(warningPref, commandName));
-                        }
+                        handleCommand(line, terminal);
                     } else {
                         // The inputted message is a normal message, not a command
                         // Print the inputted message
@@ -131,6 +119,27 @@ public class Client {
         } catch (IOException e) {
             System.err.printf("I/O error occurred when trying to connect / when connected to %s:%d\n", address, port);
             System.err.println(e.getMessage());
+        }
+    }
+
+    public static void handleCommand(String line, Terminal terminal) {
+        String commandName = ClientCmds.removeCommandPref(line);
+
+        // Handle the case where the message is just the command prefix
+        if (commandName.isEmpty()) {
+            terminalWrite(terminal, "%sType a command after %s to run it\n".formatted(warningPref,
+                    ClientCmds.commandPrefix));
+        }
+
+        // Check if the inputted command exists, and run the corresponding code for it
+        if (ClientCmds.isCommand(line, ClientCmds.EXIT_CMD)) {
+            exit = true;
+
+        } else if (ClientCmds.isCommand(line, ClientCmds.CLEAR_SCREEN_CMD)) {
+            terminal.puts(InfoCmp.Capability.clear_screen);
+
+        } else {
+            terminalWrite(terminal, "%sUnrecognized command: %s\n".formatted(warningPref, commandName));
         }
     }
 

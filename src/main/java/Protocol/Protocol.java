@@ -17,6 +17,7 @@ public class Protocol {
                 "user_creation_user_already_exists";
         public static final String USER_CREATION_SUCCESSFUL = PROTOCOL_PREF + "user_creation_successful";
         public static final String CAN_TYPE = PROTOCOL_PREF + "can_type";
+        public static final String MESSAGE_TOO_LONG = PROTOCOL_PREF + "message_too_long";
     }
 
     public static class Client {

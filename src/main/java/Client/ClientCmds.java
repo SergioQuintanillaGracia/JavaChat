@@ -2,7 +2,8 @@ package Client;
 
 class ClientCmds {
     static final String commandPrefix = "/";
-    static final String exitCommand = "exit";
+    static final String EXIT_CMD = "exit";
+    static final String CLEAR_SCREEN_CMD = "clear";
 
     static boolean hasCommandPref(String msg) {
         String trimMsg = msg.trim();
