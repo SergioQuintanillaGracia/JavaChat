@@ -136,14 +136,19 @@ public class Client {
             exit = true;
 
         } else if (ClientCmds.isCommand(line, ClientCmds.CLEAR_SCREEN_CMD)) {
-            terminal.puts(InfoCmp.Capability.clear_screen);
+            clearTerminal(terminal);
 
         } else if (ClientCmds.isCommand(line, ClientCmds.LOAD_MESSAGE_HISTORY_CMD)) {
+            clearTerminal(terminal);
             sendString(Protocol.Client.LOAD_MESSAGE_HISTORY);
 
         } else {
             terminalWrite(terminal, "%sUnrecognized command: %s\n".formatted(warningPref, commandName));
         }
+    }
+
+    public static void clearTerminal(Terminal terminal) {
+        terminal.puts(InfoCmp.Capability.clear_screen);
     }
 
     public static void sendString(String str) {
