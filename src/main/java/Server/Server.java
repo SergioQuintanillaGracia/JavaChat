@@ -10,7 +10,7 @@ import java.net.Socket;
 import java.util.*;
 
 class Server {
-    private static final String VERSION = "6";
+    private static final String VERSION = "7";
     private static int port = 49200;
     public boolean isAuthEnabled = true;
 
@@ -219,7 +219,7 @@ class Server {
 
     /* Sends a message to a specific user */
     public synchronized void sendMessage(String msg, User toUser) {
-        toUser.sendString(msg);
+        toUser.sendString(Protocol.MESSAGE_PREFIX + msg);
     }
 
     /* Sends a message to all users connected to the server */
@@ -240,7 +240,7 @@ class Server {
     public synchronized void broadcastString(String str) {
         // Send the notice to every user
         for (User u : users) {
-            u.sendString(str);
+            sendMessage(str, u);
         }
 
         // Save the string to the message history queue
@@ -251,7 +251,7 @@ class Server {
         // Send the notice to every user except `exceptUser`
         for (User u : users) {
             if (u != exceptUser) {
-                u.sendString(str);
+                sendMessage(str, u);
             }
         }
 
@@ -276,7 +276,7 @@ class Server {
 
     public synchronized void sendMessageHistory(User user) {
         for (String s : messageHistory) {
-            user.sendString(s);
+            sendMessage(s, user);
         }
     }
 
@@ -324,21 +324,27 @@ class ClientThread extends Thread {
         server.broadcastString("%sUser %s joined the chat".formatted(Server.noticePref, user.getName()), user);
 
         // Send a welcome message to the user
-        user.sendString(server.getWelcomeMessage(user));
+        server.sendMessage(server.getWelcomeMessage(user), user);
 
         // Inform the user they can start typing messages
         user.sendString(Protocol.Server.CAN_TYPE);
 
         while (user.hasNextMessage()) {
-            String msg = user.getNextMessage();
+            String str = user.getNextMessage();
 
-            if (msg.startsWith(Protocol.PROTOCOL_PREF)) {
-                // If the message starts with the protocol prefix, it may not be a normal message, but a request
-                // from the user to the server
-                server.handleProtocolMessage(msg, user);
+            if (str.startsWith(Protocol.PROTOCOL_PREF)) {
+                // If the message starts with the protocol prefix, it may be a client request to the server
+                server.handleProtocolMessage(str, user);
+
+            } else if (str.startsWith(Protocol.MESSAGE_PREFIX)) {
+                String extractedMsg = str.substring(Protocol.MESSAGE_PREFIX.length());
+
+                if (!extractedMsg.isEmpty()) {
+                    server.broadcastMessage(extractedMsg, user);
+                }
 
             } else {
-                server.broadcastMessage(msg, user);
+                System.out.println("Couldn't interpret message");
             }
         }
 

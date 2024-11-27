@@ -4,6 +4,7 @@ import java.util.Base64;
 
 public class Protocol {
     public static final String PROTOCOL_PREF = "$";
+    public static final String MESSAGE_PREFIX = "M";
 
     public static class Server {
         public static final String AUTH_REQUEST = PROTOCOL_PREF + "auth_request";

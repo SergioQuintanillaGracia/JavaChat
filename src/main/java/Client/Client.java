@@ -106,7 +106,7 @@ public class Client {
                         terminalWrite(terminal, "%s%s\n".formatted(inputMsgPref, line));
 
                         // Send the message to the server
-                        sendString(line);
+                        sendString(Protocol.MESSAGE_PREFIX + line);
                     }
                 }
 
@@ -246,9 +246,10 @@ class ReadThread extends Thread {
             if (line.startsWith(Protocol.PROTOCOL_PREF)) {
                 // The received string is a special request from the server
                 handleProtocolRequest(line);
-            } else {
+            } else if (line.startsWith(Protocol.MESSAGE_PREFIX)) {
                 // The received string is a normal message
-                lineReader.printAbove(line);
+                String msg = line.substring(Protocol.MESSAGE_PREFIX.length());
+                lineReader.printAbove(msg);
             }
         }
     }
